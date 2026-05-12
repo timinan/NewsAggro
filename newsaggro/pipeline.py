@@ -1,14 +1,21 @@
-"""Orchestrates the agents: fetch → curate → summarize → comment → edit."""
+"""Orchestrates the agents: fetch → curate → og:images → summarize → editor intro."""
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
-from .fetchers import fetch_all
+from typing import TypedDict
+from .fetchers import fetch_all, fetch_og_image, Story
 from .sources import SOURCES
-from .agents import curator, summarizer, commentator, editor, Comment
-from .config import client, PERSONAS, TOP_K
+from .agents import curator, summarizer, editor
+from .config import client, TOP_K
 
 
-def run_pipeline() -> str:
-    """Run the full pipeline. Returns the final Markdown brief."""
+class PipelineResult(TypedDict):
+    intro: str
+    stories: list[Story]
+    date: str
+
+
+def run_pipeline() -> PipelineResult:
+    """Run the full pipeline. Returns the intro + curated/summarized stories."""
     today = date.today().isoformat()
 
     print(f"\n[1/5] Fetching sources...")
@@ -18,20 +25,22 @@ def run_pipeline() -> str:
     print(f"\n[2/5] Curating top {TOP_K}...")
     top_stories = curator(raw_stories, client, top_k=TOP_K)
     for s in top_stories:
-        print(f"      → {s['title'][:70]}")
+        print(f"      → [{s.get('category', '?')}] {s['title'][:70]}")
 
-    print(f"\n[3/5] Summarizing...")
+    print(f"\n[3/5] Fetching og:images (parallel)...")
+    with ThreadPoolExecutor(max_workers=len(top_stories)) as pool:
+        images = list(pool.map(lambda s: fetch_og_image(s["url"]), top_stories))
+    for story, img in zip(top_stories, images):
+        story["image_url"] = img
+
+    print(f"\n[4/5] Summarizing (short + detailed)...")
     summarized = [summarizer(s, client) for s in top_stories]
 
-    print(f"\n[4/5] Generating commentary ({len(PERSONAS)} personas in parallel)...")
-    comments: dict[str, list[Comment]] = {}
-    with ThreadPoolExecutor(max_workers=len(PERSONAS) * 2) as pool:
-        for story in summarized:
-            futures = {
-                pool.submit(commentator, story, persona, client): persona
-                for persona in PERSONAS
-            }
-            comments[story["url"]] = [f.result() for f in futures]
+    print(f"\n[5/5] Editor writing intro...")
+    intro = editor(summarized, client, date_str=today)
 
-    print(f"\n[5/5] Editor assembling final brief...")
-    return editor(summarized, comments, client, date_str=today)
+    return {
+        "intro": intro,
+        "stories": summarized,
+        "date": today,
+    }

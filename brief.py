@@ -1,14 +1,22 @@
 #!/usr/bin/env python3
-"""Daily news brief: fetch, curate, summarize, comment, assemble."""
+"""CLI entrypoint: run the pipeline and save the rendered brief."""
 from newsaggro.pipeline import run_pipeline
-from newsaggro.output import save_brief
+from newsaggro.output import save_brief_html
+from newsaggro.renderer import render_html
 
 
 def main():
-    print("Fetching, curating, summarizing, commenting...")
-    markdown = run_pipeline()
-    path = save_brief(markdown)
-    print(f"\nBrief written to: {path}")
+    print("Fetching, curating, summarizing...")
+    result = run_pipeline()
+    html = render_html(
+        stories=result["stories"],
+        date_str=result["date"],
+        intro=result["intro"],
+    )
+    html_path, index_path = save_brief_html(html)
+    print(f"\nHTML brief: {html_path}")
+    print(f"Latest:     {index_path}")
+    print(f"\nOpen with: open {index_path}")
 
 
 if __name__ == "__main__":

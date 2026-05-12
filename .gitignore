@@ -7,7 +7,9 @@ venv/
 env/
 .DS_Store
 briefs/*.md
+briefs/*.html
 !briefs/.gitkeep
+!briefs/empty.html
 .idea/
 .vscode/
 *.egg-info/

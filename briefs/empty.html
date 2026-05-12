@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NewsAggro</title>
+<style>
+  :root {
+    --bg: #0a0a0b;
+    --surface: #15151a;
+    --text: #e8e8ea;
+    --text-strong: #ffffff;
+    --muted: #8a8a92;
+    --border: rgba(255,255,255,0.08);
+    --builder: #4ade80;
+    --link: #74a8ff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    max-width: 880px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 28px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .wordmark {
+    font-weight: 800;
+    font-size: 19px;
+    letter-spacing: -0.4px;
+    color: var(--text-strong);
+  }
+  .wordmark .dot { color: var(--builder); margin-left: 1px; }
+  main {
+    flex: 1;
+    max-width: 880px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 24px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  h1 {
+    font-size: clamp(36px, 6vw, 54px);
+    margin: 0;
+    letter-spacing: -1.5px;
+    font-weight: 800;
+    color: var(--text-strong);
+    line-height: 1.05;
+  }
+  p {
+    margin: 0;
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 540px;
+  }
+  .refresh-btn {
+    margin-top: 12px;
+    background: var(--builder);
+    color: #0a0a0b;
+    border: none;
+    border-radius: 10px;
+    padding: 13px 22px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.15s, transform 0.1s;
+  }
+  .refresh-btn:hover:not(:disabled) { filter: brightness(1.08); }
+  .refresh-btn:active:not(:disabled) { transform: translateY(1px); }
+  .refresh-btn:disabled { opacity: 0.7; cursor: progress; }
+  .status {
+    color: var(--muted);
+    font-size: 13px;
+    height: 18px;
+  }
+  footer {
+    max-width: 880px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 24px;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+    border-top: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wordmark">NewsAggro<span class="dot">•</span></div>
+</header>
+
+<main>
+  <h1>No brief yet.</h1>
+  <p>Run the 5-agent pipeline to fetch today's stories, curate the top 5, summarize, and assemble. The first run takes about 60-90 seconds.</p>
+  <button class="refresh-btn" id="refreshBtn">🔄 Generate today's brief</button>
+  <div class="status" id="status"></div>
+</main>
+
+<footer>NewsAggro · multi-agent news aggregator</footer>
+
+<script>
+(function() {
+  const btn = document.getElementById('refreshBtn');
+  const status = document.getElementById('status');
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = '⏳ Working...';
+    status.textContent = 'Fetching, curating, summarizing, commenting, rendering. Stay with me.';
+    try {
+      const res = await fetch('/api/generate', { method: 'POST' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      status.textContent = '✓ Done. Loading brief...';
+      setTimeout(() => location.reload(), 400);
+    } catch (e) {
+      status.textContent = '✗ ' + (e.message || 'Error') + '. Try again.';
+      btn.disabled = false;
+      btn.textContent = '🔄 Generate today\'s brief';
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
