@@ -120,15 +120,54 @@
 (function() {
   const btn = document.getElementById('refreshBtn');
   const status = document.getElementById('status');
+
+  const STAGE_MESSAGES = {
+    starting:  'Starting pipeline...',
+    fetch:     'Fetching news from sources',
+    curate:    'Curating top stories',
+    images:    'Fetching article images',
+    summarize: 'Summarizing story',
+    editor:    'Writing intro paragraph',
+    render:    'Rendering page',
+    done:      '✓ Done. Loading brief...',
+    error:     '✗ Error',
+  };
+
+  async function pollStatus() {
+    try {
+      const r = await fetch('/api/status');
+      const s = await r.json();
+      const base = STAGE_MESSAGES[s.stage] || s.stage;
+      const info = s.info ? ' (' + s.info + ')' : '';
+      status.textContent = base + info + (s.stage === 'done' || s.stage === 'error' ? '' : '...');
+      if (s.stage === 'done') {
+        setTimeout(() => location.reload(), 400);
+        return false;
+      }
+      if (s.stage === 'error') {
+        status.textContent = '✗ ' + (s.error || 'Error') + '. Try again.';
+        btn.disabled = false;
+        btn.textContent = '🔄 Generate today\'s brief';
+        return false;
+      }
+      return true;
+    } catch (e) {
+      status.textContent = '✗ Status poll failed: ' + e.message;
+      return false;
+    }
+  }
+
   btn.addEventListener('click', async () => {
     btn.disabled = true;
     btn.textContent = '⏳ Working...';
-    status.textContent = 'Fetching, curating, summarizing, commenting, rendering. Stay with me.';
+    status.textContent = 'Starting...';
     try {
       const res = await fetch('/api/generate', { method: 'POST' });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      status.textContent = '✓ Done. Loading brief...';
-      setTimeout(() => location.reload(), 400);
+      if (!res.ok && res.status !== 409) throw new Error('HTTP ' + res.status);
+      const interval = setInterval(async () => {
+        const keepPolling = await pollStatus();
+        if (!keepPolling) clearInterval(interval);
+      }, 700);
     } catch (e) {
       status.textContent = '✗ ' + (e.message || 'Error') + '. Try again.';
       btn.disabled = false;

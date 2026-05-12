@@ -104,9 +104,9 @@ _PAGE = """<!doctype html>
   a:hover {{ text-decoration: underline; }}
 
   header {{
-    max-width: 880px;
+    max-width: 1240px;
     margin: 0 auto;
-    padding: 28px 24px 0;
+    padding: 28px 28px 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -152,7 +152,7 @@ _PAGE = """<!doctype html>
   }}
   .theme-toggle:hover {{ background: var(--surface-hover); border-color: var(--border-strong); }}
 
-  main {{ max-width: 880px; margin: 0 auto; padding: 0 24px; }}
+  main {{ max-width: 1240px; margin: 0 auto; padding: 0 28px; }}
 
   .status {{
     color: var(--muted);
@@ -188,16 +188,18 @@ _PAGE = """<!doctype html>
   }}
 
   .stories {{
-    display: flex;
-    flex-direction: column;
-    gap: 22px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
     padding-bottom: 48px;
   }}
   .story {{
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 26px 28px 22px;
+    border-radius: 14px;
+    padding: 20px 22px 18px;
+    display: flex;
+    flex-direction: column;
     transition: background 0.18s, border-color 0.18s, transform 0.18s;
   }}
   .story:hover {{
@@ -218,11 +220,11 @@ _PAGE = """<!doctype html>
     margin-bottom: 14px;
   }}
   .story h2 {{
-    font-size: clamp(20px, 2.6vw, 26px);
+    font-size: clamp(16px, 1.6vw, 19px);
     font-weight: 700;
-    margin: 0 0 18px;
-    line-height: 1.28;
-    letter-spacing: -0.4px;
+    margin: 0 0 14px;
+    line-height: 1.3;
+    letter-spacing: -0.3px;
   }}
   .story h2 a {{
     color: var(--text-strong);
@@ -258,8 +260,9 @@ _PAGE = """<!doctype html>
   .summary {{
     color: var(--text);
     margin: 0 0 6px;
-    font-size: 15.5px;
-    line-height: 1.65;
+    font-size: 14px;
+    line-height: 1.55;
+    flex: 1;
   }}
 
   details {{ margin: 0; }}
@@ -294,9 +297,9 @@ _PAGE = """<!doctype html>
   }}
 
   footer {{
-    max-width: 880px;
+    max-width: 1240px;
     margin: 0 auto;
-    padding: 24px 24px 40px;
+    padding: 24px 28px 40px;
     color: var(--muted-2);
     font-size: 12px;
     border-top: 1px solid var(--border);
@@ -304,9 +307,13 @@ _PAGE = """<!doctype html>
     letter-spacing: 0.4px;
   }}
 
+  @media (max-width: 980px) {{
+    .stories {{ grid-template-columns: repeat(2, 1fr); }}
+  }}
   @media (max-width: 640px) {{
+    .stories {{ grid-template-columns: 1fr; }}
     .hero {{ margin: 28px 0; }}
-    .story {{ padding: 22px 20px 18px; }}
+    .story {{ padding: 20px 18px 16px; }}
   }}
 </style>
 </head>
@@ -319,7 +326,7 @@ _PAGE = """<!doctype html>
     <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">☀</button>
   </div>
 </header>
-<div style="max-width: 880px; margin: 0 auto; padding: 0 24px;">
+<div style="max-width: 1240px; margin: 0 auto; padding: 0 28px;">
   <div class="status" id="status"></div>
 </div>
 
@@ -357,15 +364,54 @@ _PAGE = """<!doctype html>
 
   const refreshBtn = document.getElementById('refreshBtn');
   const status = document.getElementById('status');
+
+  const STAGE_MESSAGES = {{
+    starting:   'Starting pipeline...',
+    fetch:      'Fetching news from sources',
+    curate:     'Curating top stories',
+    images:     'Fetching article images',
+    summarize:  'Summarizing story',
+    editor:     'Writing intro paragraph',
+    render:     'Rendering new layout',
+    done:       '✓ Done. Loading new brief...',
+    error:      '✗ Error',
+  }};
+
+  async function pollStatus() {{
+    try {{
+      const r = await fetch('/api/status');
+      const s = await r.json();
+      const base = STAGE_MESSAGES[s.stage] || s.stage;
+      const info = s.info ? ' (' + s.info + ')' : '';
+      status.textContent = base + info + (s.stage === 'done' || s.stage === 'error' ? '' : '...');
+      if (s.stage === 'done') {{
+        setTimeout(() => location.reload(), 400);
+        return false;
+      }}
+      if (s.stage === 'error') {{
+        status.textContent = '✗ ' + (s.error || 'Error') + '. Try again.';
+        refreshBtn.disabled = false;
+        refreshBtn.textContent = '🔄 Refresh';
+        return false;
+      }}
+      return true;
+    }} catch (e) {{
+      status.textContent = '✗ Status poll failed: ' + e.message;
+      return false;
+    }}
+  }}
+
   refreshBtn.addEventListener('click', async () => {{
     refreshBtn.disabled = true;
     refreshBtn.textContent = '⏳ Working...';
-    status.textContent = 'Fetching, curating, summarizing...';
+    status.textContent = 'Starting...';
     try {{
       const res = await fetch('/api/generate', {{ method: 'POST' }});
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      status.textContent = '✓ Done. Loading new brief...';
-      setTimeout(() => location.reload(), 300);
+      if (!res.ok && res.status !== 409) throw new Error('HTTP ' + res.status);
+      const interval = setInterval(async () => {{
+        const keepPolling = await pollStatus();
+        if (!keepPolling) clearInterval(interval);
+      }}, 700);
     }} catch (e) {{
       status.textContent = '✗ ' + (e.message || 'Error') + '. Try again.';
       refreshBtn.disabled = false;
