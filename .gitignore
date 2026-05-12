@@ -1,0 +1,15 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+.DS_Store
+briefs/*.md
+!briefs/.gitkeep
+.idea/
+.vscode/
+*.egg-info/
+dist/
+build/
